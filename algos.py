@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 
 import tensorflow as tf
 
@@ -74,7 +74,14 @@ def create_XY_data(source_data, output_parameter, geophysical_method, samples_nu
 
 def train_NN(trn_data, vld_data, 
              geophysical_method, output_parameter, samples_number, randomseed, 
-             model_name_template):
+             model_name_template,
+             learning_rate=0.1,
+             momentum=0.5,
+             tol=0.001,
+             n_iter_no_change=500,
+             max_epochs=50000,
+             rel_batch_size=0.05
+             ):
     
     _trn_data = copy.deepcopy(trn_data) 
     _vld_data = copy.deepcopy(vld_data)
@@ -105,23 +112,23 @@ def train_NN(trn_data, vld_data,
     _model.add(tf.keras.layers.Dense(32, activation=tf.nn.sigmoid))
     _model.add(tf.keras.layers.Dense(1,  activation=None))    
 
-    _optimizer = keras.optimizers.SGD(learning_rate = 0.1,#0.001,
-                                      momentum = 0.5,
+    _optimizer = keras.optimizers.SGD(learning_rate = learning_rate,#0.001,
+                                      momentum = momentum,#0.5,
                                       nesterov=True)
         
     _model.compile(_optimizer, loss=tf.keras.losses.MeanSquaredError())
     
     _early_stopping = EarlyStopping(monitor='val_loss',
-                                    min_delta=0.001 * 0.05,#0.0001, 
-                                    patience=500,#500,
+                                    min_delta=tol * rel_batch_size,#0.0001, 
+                                    patience=n_iter_no_change,#500,
                                     restore_best_weights=True)
       
     ### Train model
     print("Start train model:", _model_name)
 
     _history = _model.fit(x=_X_trn, y=_Y_trn,
-                          batch_size=math.ceil(len(_X_trn) * 0.05),
-                          epochs=50000, #100000,
+                          batch_size=math.ceil(len(_X_trn) * rel_batch_size),
+                          epochs=max_epochs, #100000,
                           verbose=0,
                           callbacks=[_early_stopping],
                           validation_data=(_X_vld, _Y_vld))
@@ -173,6 +180,7 @@ def app_stat_NN(model, tst_data,
     _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
     _rmse = round(mean_squared_error(_Y_tst, _Y_pred, squared = False), 5)
     _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
 
 
@@ -184,18 +192,30 @@ def app_stat_NN(model, tst_data,
     #_statistics_DF.to_csv(_dir_path+"/"+ _file_name + '.csv')
     
     #return _statistics_DF
-    return [_rmse, _mae, _r2]
+    return [_rmse, _mae, _r2, _mape]
 
 
 def alg_keras_mlp(trn_data, vld_data, tst_data,
-             geophysical_method, output_parameter, randomseed=None
+             geophysical_method, output_parameter, randomseed=None,
+             learning_rate=0.1,
+             momentum=0.5,
+             tol=0.001,
+             n_iter_no_change=500,
+             max_epochs=50000,
+             rel_batch_size=0.05
              ):
     
     keras_nn = train_NN(trn_data, vld_data,
                          geophysical_method,
                          output_parameter, 
                          "all", randomseed, 
-                         "?")
+                         "?",
+                         learning_rate=learning_rate,
+                         momentum=momentum,
+                         tol=tol,
+                         n_iter_no_change=n_iter_no_change,
+                         max_epochs=max_epochs,
+                         rel_batch_size=rel_batch_size)
             
     stat_DF = app_stat_NN(keras_nn, tst_data,
                       geophysical_method,
@@ -208,7 +228,14 @@ def alg_keras_mlp(trn_data, vld_data, tst_data,
 
 def vector_pred_NN(trn_data, vld_data, tst_data,
                 geophysical_method, l_output_parameter, randomseed=None, 
-                model_name_template='?'):
+                model_name_template='?',
+                learning_rate=0.1,
+                momentum=0.5,
+                tol=0.001,
+                n_iter_no_change=500,
+                max_epochs=50000,
+                rel_batch_size=0.05
+                ):
     '''Conducting prediction for each output from l_output_parameter. 
     One NN for each output_parameter from l_output_parameter.
     Return vector [mae, mse, r2]
@@ -224,7 +251,13 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
     for output_parameter in l_output_parameter:
         model = train_NN(trn_data, vld_data, 
                 geophysical_method, output_parameter, "all", randomseed, 
-                model_name_template=model_name_template)
+                model_name_template=model_name_template,
+                learning_rate=learning_rate,
+                momentum=momentum,
+                tol=tol,
+                n_iter_no_change=n_iter_no_change,
+                max_epochs=max_epochs,
+                rel_batch_size=rel_batch_size)
         
         
         _output_parameter = copy.deepcopy(output_parameter)
@@ -237,8 +270,9 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
     _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
-    return [_mae, _rmse, _r2]
+    return [_mae, _rmse, _r2, _mape]
 
 
 # ----- KAN -----
@@ -279,7 +313,12 @@ def get_KAN_dataset(trn_data, vld_data, tst_data,
 def train_KAN(dataset_3,
                 RS=1,
                 K=3, # order of piecewise polynomial in B-splines
-                hidden_neurons=1
+                hidden_neurons=1,
+                learning_rate=0.1,
+                tol=0.001,
+                n_iter_no_change=25,
+                max_epochs=500,
+                lamb=0
                 ):
     
     ### Create model
@@ -288,26 +327,37 @@ def train_KAN(dataset_3,
     model = KAN_es(width=[INPUT_SHAPE, hidden_neurons, 1], grid=3, k=K, seed=RS)
 
     result = model.train_es(dataset_3,
-                          tol=0.001, #0.0001
-                          n_iter_no_change=25,
-                          opt="LBFGS", steps=1000, 
-                          lamb=0,
+                          tol=tol, #0.0001
+                          n_iter_no_change=n_iter_no_change,
+                          opt="LBFGS", steps=max_epochs, 
+                          lamb=lamb,
                           lamb_l1=1,
-                          lamb_entropy=2)
+                          lamb_entropy=2,
+                          lr=learning_rate)
     
     return model, result
 
 
 def alg_KAN_model(trn_data, vld_data, tst_data,
                   geophysical_method, output_parameter, randomseed=None,
-                  K=3,hidden_neurons=1
+                  K=3,hidden_neurons=1,
+                  learning_rate=0.1,
+                  tol=0.001,
+                  n_iter_no_change=25,
+                  max_epochs=500,
+                  lamb=0
                   ):
     dataset_3 = get_KAN_dataset(trn_data, vld_data, tst_data,
                 geophysical_method,
                 output_parameter, 
                 "all")
     
-    model = train_KAN(dataset_3, randomseed, K=K, hidden_neurons=hidden_neurons)
+    model = train_KAN(dataset_3, randomseed, K=K, hidden_neurons=hidden_neurons, 
+                      learning_rate=learning_rate,
+                      tol=tol,
+                      n_iter_no_change=n_iter_no_change,
+                      max_epochs=max_epochs,
+                      lamb=lamb)
 
     _Y_tst = dataset_3['test_label'].detach().numpy()
     _Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
@@ -315,13 +365,19 @@ def alg_KAN_model(trn_data, vld_data, tst_data,
     _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
     _rmse = round(mean_squared_error(_Y_tst, _Y_pred, squared = False), 5)
     _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
-    return [_mae, _rmse, _r2]
+    return [_mae, _rmse, _r2, _mape]
 
 
 def vector_pred_KAN(trn_data, vld_data, tst_data,
                     geophysical_method, l_output_parameter, randomseed=None, 
-                    K=3,hidden_neurons=1):
+                    K=3,hidden_neurons=1,
+                    learning_rate=0.1,
+                    tol=0.001,
+                    n_iter_no_change=25,
+                    max_epochs=500,
+                    lamb=0):
     '''Conducting prediction for each output from l_output_parameter. 
     One KAN for each output_parameter from l_output_parameter.
     Return vector [mae, mse, r2]
@@ -340,7 +396,12 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
         model = train_KAN(dataset_3,
                           RS=randomseed,
                           K=K,
-                          hidden_neurons=hidden_neurons)
+                          hidden_neurons=hidden_neurons,
+                          learning_rate=learning_rate,
+                          tol=tol,
+                          n_iter_no_change=n_iter_no_change,
+                          max_epochs=max_epochs,
+                          lamb=lamb)
         
         _Y_tst = dataset_3['test_label'].detach().numpy()
         _Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
@@ -351,8 +412,9 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
     _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
-    return [_mae, _rmse, _r2]
+    return [_mae, _rmse, _r2, _mape]
 
 
 # ----- Multi Exp------
