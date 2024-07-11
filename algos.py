@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
 import tensorflow as tf
 
@@ -97,7 +98,7 @@ def train_NN(trn_data, vld_data,
                    str(_samples_number) + "_" +
                    _output_parameter + "_rs" +
                    str(_randomseed))
-                               
+    
     ### Create input-output data
     
     _dataset_sizes = {"all":"all", 3500:1000, 1750:500, 1000:300, 700:200, 350:100, 175:50}
@@ -192,7 +193,7 @@ def app_stat_NN(model, tst_data,
     #_statistics_DF.to_csv(_dir_path+"/"+ _file_name + '.csv')
     
     #return _statistics_DF
-    return [_rmse, _mae, _r2, _mape]
+    return [_rmse, _mae, _mape, _r2]
 
 
 def alg_keras_mlp(trn_data, vld_data, tst_data,
@@ -272,7 +273,7 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
-    return [_mae, _rmse, _r2, _mape]
+    return [_rmse, _mae, _mape, _r2]
 
 
 # ----- KAN -----
@@ -351,7 +352,7 @@ def alg_KAN_model(trn_data, vld_data, tst_data,
                 geophysical_method,
                 output_parameter, 
                 "all")
-    
+
     model = train_KAN(dataset_3, randomseed, K=K, hidden_neurons=hidden_neurons, 
                       learning_rate=learning_rate,
                       tol=tol,
@@ -367,7 +368,7 @@ def alg_KAN_model(trn_data, vld_data, tst_data,
     _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
-    return [_mae, _rmse, _r2, _mape]
+    return [_rmse, _mae, _mape, _r2]
 
 
 def vector_pred_KAN(trn_data, vld_data, tst_data,
@@ -414,7 +415,47 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
-    return [_mae, _rmse, _r2, _mape]
+    return [_rmse, _mae, _mape, _r2]
+
+
+# ----- SKL models (RF, GB) -----
+
+def vector_pred_skl(trn_data, vld_data, tst_data,
+                    geophysical_method, l_output_parameter, randomseed=None,
+                    class_model=RandomForestRegressor, model_kwargs={}):
+    _trn_data = copy.deepcopy(trn_data) 
+    _vld_data = copy.deepcopy(vld_data)
+    _geophysical_method = copy.deepcopy(geophysical_method)
+    _tst_data = copy.deepcopy(tst_data)
+
+    _X_tst, _Y_tst = create_XY_data(_tst_data, l_output_parameter[0], _geophysical_method, "all")
+
+    _vector_Y_pred = np.array([[] for i in range(_Y_tst.shape[0])])
+    _vector_Y_tst = np.array([[] for i in range(_Y_tst.shape[0])])
+
+
+    for output_parameter in l_output_parameter:
+        _X_trn, _Y_trn = create_XY_data(_trn_data, output_parameter, _geophysical_method, 'all')
+        _X_vld, _Y_vld = create_XY_data(_vld_data, output_parameter, _geophysical_method, 'all')
+        _X_trn_vld, _Y_trn_vld = pd.concat([_X_trn, _X_vld], ignore_index=True), pd.concat([_Y_trn, _Y_vld], ignore_index=True).to_numpy().ravel()
+
+        _X_tst, _Y_tst = create_XY_data(_tst_data, output_parameter, _geophysical_method, 'all')
+
+        model = class_model(random_state=randomseed, 
+                            **model_kwargs)
+        model.fit(_X_trn_vld, _Y_trn_vld)
+        print(f'{class_model} fitted with randomseed: {randomseed}')
+
+        _Y_pred = model.predict(_X_tst).reshape(-1, 1)
+        _vector_Y_pred = np.concatenate((_vector_Y_pred, _Y_pred), axis=1)
+        _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
+
+    _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
+    _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
+    _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
+
+    return [_rmse, _mae, _mape, _r2]
 
 
 # ----- Multi Exp------
