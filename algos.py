@@ -287,7 +287,7 @@ def get_KAN_dataset(trn_data, vld_data, tst_data,
     _vld_data = copy.deepcopy(vld_data)
     _tst_data = copy.deepcopy(tst_data)
     _geophysical_method = copy.deepcopy(geophysical_method)
-    _output_parameter = copy.deepcopy(output_parameter)    
+    _output_parameter = copy.deepcopy(output_parameter)
     _samples_number = copy.deepcopy(samples_number)
 
     ### Create input-output data
@@ -324,8 +324,9 @@ def train_KAN(dataset_3,
     
     ### Create model
     INPUT_SHAPE = dataset_3['train_input'].shape[1]
+    OUTPUT_SHAPE = dataset_3['train_label'].shape[1]
 
-    model = KAN_es(width=[INPUT_SHAPE, hidden_neurons, 1], grid=3, k=K, seed=RS)
+    model = KAN_es(width=[INPUT_SHAPE, hidden_neurons, OUTPUT_SHAPE], grid=3, k=K, seed=RS)
 
     result = model.train_es(dataset_3,
                           tol=tol, #0.0001
@@ -394,6 +395,7 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
         dataset_3 = get_KAN_dataset(trn_data, vld_data, tst_data,
                         geophysical_method, output_parameter, 'all')
         
+        print(hidden_neurons)
         model = train_KAN(dataset_3,
                           RS=randomseed,
                           K=K,
@@ -410,6 +412,85 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
         _vector_Y_pred = np.concatenate((_vector_Y_pred, _Y_pred), axis=1)
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
         
+    _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
+    _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
+    _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
+
+    return [_rmse, _mae, _mape, _r2]
+
+
+# --- Functions for 1 KAN with 3 output values
+def get_KAN_dataset_3_output(trn_data, vld_data, tst_data,
+                             geophysical_method, l_output_parameter=['H1_8', 'H2_8', 'H3_8'],samples_number='all'):
+    
+    _trn_data = copy.deepcopy(trn_data)
+    _vld_data = copy.deepcopy(vld_data)
+    _tst_data = copy.deepcopy(tst_data)
+    _geophysical_method = copy.deepcopy(geophysical_method)
+
+    _l_output_parameter = copy.deepcopy(l_output_parameter)
+    _output_parameter = _l_output_parameter[0]
+    _samples_number = copy.deepcopy(samples_number)
+
+### Create input-output data
+    _dataset_sizes = {"all":"all", 3500:1000, 1750:500, 1000:300, 700:200, 350:100, 175:50}
+    _X_trn, _Y_trn = create_XY_data(_trn_data, _output_parameter, _geophysical_method, _samples_number)
+    _X_vld, _Y_vld = create_XY_data(_vld_data, _output_parameter, _geophysical_method, _dataset_sizes[_samples_number])
+    _X_tst, _Y_tst = create_XY_data(_tst_data, _output_parameter, _geophysical_method, 'all')
+
+    for _output_parameter in _l_output_parameter[1:]:
+        _, _Y_trn_new = create_XY_data(_trn_data, _output_parameter, _geophysical_method, _samples_number)
+        _, _Y_vld_new = create_XY_data(_vld_data, _output_parameter, _geophysical_method, _dataset_sizes[_samples_number])
+        _, _Y_tst_new = create_XY_data(_tst_data, _output_parameter, _geophysical_method, 'all')
+
+        _Y_trn = pd.concat([_Y_trn, _Y_trn_new], axis=1)
+        _Y_vld = pd.concat([_Y_vld, _Y_vld_new], axis=1)
+        _Y_tst = pd.concat([_Y_tst, _Y_tst_new], axis=1)
+
+    _tc_X_trn, _tc_Y_trn = torch.from_numpy(_X_trn.to_numpy()), torch.from_numpy(_Y_trn.to_numpy())
+    _tc_X_vld, _tc_Y_vld = torch.from_numpy(_X_vld.to_numpy()), torch.from_numpy(_Y_vld.to_numpy())
+    _tc_X_tst, _tc_Y_tst = torch.from_numpy(_X_tst.to_numpy()), torch.from_numpy(_Y_tst.to_numpy())
+
+    dataset_3 = {'train_input': _tc_X_trn,
+             'train_label': _tc_Y_trn,
+             'val_input': _tc_X_vld,
+             'val_label': _tc_Y_vld,
+             'test_input': _tc_X_tst,
+             'test_label': _tc_Y_tst}
+
+    return dataset_3
+
+
+def vector_pred_KAN_3_output(trn_data, vld_data, tst_data,
+                    geophysical_method, l_output_parameter=['H1_8', 'H2_8', 'H3_8'], randomseed=1, 
+                    K=3,hidden_neurons=1,
+                    learning_rate=0.1,
+                    tol=0.001,
+                    n_iter_no_change=25,
+                    max_epochs=500,
+                    lamb=0):
+    '''Conducting prediction for outputs from l_output_parameter. 
+    One KAN for all output_parameter from l_output_parameter.
+    Return vector [mae, mse, r2]
+    '''
+    dataset_3 = get_KAN_dataset_3_output(trn_data, vld_data, tst_data,
+                        geophysical_method, l_output_parameter, 'all')
+
+    print(hidden_neurons)
+    model = train_KAN(dataset_3,
+                          RS=randomseed,
+                          K=K,
+                          hidden_neurons=hidden_neurons,
+                          learning_rate=learning_rate,
+                          tol=tol,
+                          n_iter_no_change=n_iter_no_change,
+                          max_epochs=max_epochs,
+                          lamb=lamb)
+
+    _vector_Y_tst = dataset_3['test_label'].detach().numpy()
+    _vector_Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
+    
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
     _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
