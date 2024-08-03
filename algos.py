@@ -276,6 +276,173 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
     return [_rmse, _mae, _mape, _r2]
 
 
+# --- 1 NN with 3 output values
+
+def train_NN_3_output(trn_data, vld_data, 
+             geophysical_method, samples_number, randomseed, 
+             model_name_template,
+             l_output_parameter=['H1_8', 'H2_8', 'H3_8'],
+             hidden_neurons = 32,
+             learning_rate=0.1,
+             momentum=0.5,
+             tol=0.001,
+             n_iter_no_change=500,
+             max_epochs=50000,
+             rel_batch_size=0.05
+             ):
+    
+    _trn_data = copy.deepcopy(trn_data) 
+    _vld_data = copy.deepcopy(vld_data)
+    _geophysical_method = copy.deepcopy(geophysical_method)
+    _l_output_parameter = copy.deepcopy(l_output_parameter)    
+    _samples_number = copy.deepcopy(samples_number)  
+    _randomseed = copy.deepcopy(randomseed)
+    _model_name_template = copy.deepcopy(model_name_template)
+
+
+    _model_name = (_model_name_template + "_" + 
+                   _geophysical_method + "_" + 
+                   str(_samples_number) + "_" +
+                   str(_l_output_parameter) + "_rs" +
+                   str(_randomseed))
+    
+    ### Create input-output data
+    
+    _dataset_sizes = {"all":"all", 3500:1000, 1750:500, 1000:300, 700:200, 350:100, 175:50}
+    _X_trn, _Y_trn = create_XY_data(_trn_data, _l_output_parameter[0], _geophysical_method, _samples_number)
+    _X_vld, _Y_vld = create_XY_data(_vld_data, _l_output_parameter[0], _geophysical_method, _dataset_sizes[_samples_number])
+
+    for _output_parameter in _l_output_parameter[1:]:
+        _, _Y_trn_new = create_XY_data(_trn_data, _output_parameter, _geophysical_method, _samples_number)
+        _, _Y_vld_new = create_XY_data(_vld_data, _output_parameter, _geophysical_method, _dataset_sizes[_samples_number])
+
+        _Y_trn = pd.concat([_Y_trn, _Y_trn_new], axis=1)
+        _Y_vld = pd.concat([_Y_vld, _Y_vld_new], axis=1)
+
+    ### Create model
+
+    tf.keras.utils.set_random_seed(_randomseed)
+
+    _model = tf.keras.models.Sequential() 
+    _model.add(tf.keras.layers.Dense(hidden_neurons, activation=tf.nn.sigmoid))
+    _model.add(tf.keras.layers.Dense(3,  activation=None))
+
+    _optimizer = keras.optimizers.SGD(learning_rate = learning_rate,#0.001,
+                                      momentum = momentum,#0.5,
+                                      nesterov=True)
+
+    _model.compile(_optimizer, loss=tf.keras.losses.MeanSquaredError())
+    
+    _early_stopping = EarlyStopping(monitor='val_loss',
+                                    min_delta=tol * rel_batch_size,#0.0001, 
+                                    patience=n_iter_no_change,#500,
+                                    restore_best_weights=True)
+
+    ### Train model
+    print("Start train model:", _model_name)
+
+    _history = _model.fit(x=_X_trn, y=_Y_trn,
+                          batch_size=math.ceil(len(_X_trn) * rel_batch_size),
+                          epochs=max_epochs, #100000,
+                          verbose=0,
+                          callbacks=[_early_stopping],
+                          validation_data=(_X_vld, _Y_vld))
+
+    _n_epochs = len(_history.history['loss'])
+    
+    print('Number of epochs for training NN model:' + str(_n_epochs))
+    
+    ### Save model
+    
+    #_model.save(_dir_path+"/"+ _model_name+".keras")
+    
+    _history_df = pd.DataFrame(_history.history)
+    #plot_history_NN(_history_df, _model_name, _dir_path)
+    
+    #_history_df.to_csv(_dir_path+"/"+ _model_name + '_history.csv')
+    
+    return _model, _history_df, _n_epochs
+
+
+def app_stat_NN_3_output(model, tst_data, 
+                geophysical_method, samples_number, randomseed, 
+                file_name_template, file_name_suffix, l_output_parameter=['H1_8', 'H2_8', 'H3_8']):
+        
+    _tst_data = copy.deepcopy(tst_data) 
+    _geophysical_method = copy.deepcopy(geophysical_method)
+    _l_output_parameter = copy.deepcopy(l_output_parameter)
+    _samples_number = copy.deepcopy(samples_number) 
+    _randomseed = copy.deepcopy(randomseed)    
+    _file_name_template = copy.deepcopy(file_name_template)
+    _file_name_suffix = copy.deepcopy(file_name_suffix)    
+    #_dir_path = copy.deepcopy(dir_path)
+    
+    _file_name =  (_file_name_template + "_" + 
+                   _geophysical_method + "_" + 
+                   str(_samples_number) + "_" +
+                   str(_l_output_parameter) + "_rs" +
+                   str(_randomseed) + "_" + 
+                   _file_name_suffix)
+      
+    ### Create input-output data
+    
+    _X_tst, _Y_tst = create_XY_data(_tst_data, _l_output_parameter[0], _geophysical_method, "all")
+  
+    for _output_parameter in _l_output_parameter[1:]:
+        _, _Y_tst_new = create_XY_data(_tst_data, _output_parameter, _geophysical_method, _samples_number)
+        
+        _Y_tst = pd.concat([_Y_tst, _Y_tst_new], axis=1)
+    ### Apply and calculate statistics
+
+    _Y_pred = model[0].predict(_X_tst)
+    
+    _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
+    _rmse = round(mean_squared_error(_Y_tst, _Y_pred, squared = False), 5)
+    _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
+    _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
+
+
+
+    #_statistics_DF = pd.DataFrame({'epochs': model[2]-500, 'MAE': _mae, 'RMSE':_rmse, 'R2': _r2}, 
+    #                              index=[_file_name])
+    
+    #print(_statistics_DF)
+    
+    #_statistics_DF.to_csv(_dir_path+"/"+ _file_name + '.csv')
+    
+    #return _statistics_DF
+    return [_rmse, _mae, _mape, _r2]
+
+
+def alg_keras_mlp_3_output(trn_data, vld_data, tst_data,
+             geophysical_method, l_output_parameter=['H1_8', 'H2_8', 'H3_8'], randomseed=None,
+             learning_rate=0.1,
+             momentum=0.5,
+             tol=0.001,
+             n_iter_no_change=500,
+             max_epochs=50000,
+             rel_batch_size=0.05
+             ):
+    
+    keras_nn = train_NN_3_output(trn_data, vld_data,
+                         geophysical_method, 
+                         "all", randomseed, 
+                         "?",
+                         learning_rate=learning_rate,
+                         momentum=momentum,
+                         tol=tol,
+                         n_iter_no_change=n_iter_no_change,
+                         max_epochs=max_epochs,
+                         rel_batch_size=rel_batch_size)
+            
+    stat_DF = app_stat_NN_3_output(keras_nn, tst_data,
+                      geophysical_method,
+                      "all", randomseed, 
+                      "stat_udus", "?")
+    
+    return stat_DF
+
+
 # ----- KAN -----
 
 
@@ -420,7 +587,8 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
     return [_rmse, _mae, _mape, _r2]
 
 
-# --- Functions for 1 KAN with 3 output values
+# --- 1 KAN with 3 output values
+
 def get_KAN_dataset_3_output(trn_data, vld_data, tst_data,
                              geophysical_method, l_output_parameter=['H1_8', 'H2_8', 'H3_8'],samples_number='all'):
     
@@ -490,7 +658,7 @@ def vector_pred_KAN_3_output(trn_data, vld_data, tst_data,
 
     _vector_Y_tst = dataset_3['test_label'].detach().numpy()
     _vector_Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
-    
+
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
     _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
