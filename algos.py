@@ -349,7 +349,7 @@ def train_NN_3_output(trn_data, vld_data,
                           validation_data=(_X_vld, _Y_vld))
 
     _n_epochs = len(_history.history['loss'])
-    
+
     print('Number of epochs for training NN model:' + str(_n_epochs))
     
     ### Save model
