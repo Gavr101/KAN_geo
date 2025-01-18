@@ -81,7 +81,8 @@ def train_NN(trn_data, vld_data,
              tol=0.001,
              n_iter_no_change=500,
              max_epochs=50000,
-             rel_batch_size=0.05
+             rel_batch_size=0.05,
+             hidden_neurons = 32,
              ):
     
     _trn_data = copy.deepcopy(trn_data) 
@@ -110,7 +111,7 @@ def train_NN(trn_data, vld_data,
     tf.keras.utils.set_random_seed(_randomseed)
     
     _model = tf.keras.models.Sequential() 
-    _model.add(tf.keras.layers.Dense(32, activation=tf.nn.sigmoid))
+    _model.add(tf.keras.layers.Dense(hidden_neurons, activation=tf.nn.sigmoid))
     _model.add(tf.keras.layers.Dense(1,  activation=None))    
 
     _optimizer = keras.optimizers.SGD(learning_rate = learning_rate,#0.001,
@@ -235,7 +236,8 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
                 tol=0.001,
                 n_iter_no_change=500,
                 max_epochs=50000,
-                rel_batch_size=0.05
+                rel_batch_size=0.05,
+                hidden_neurons=32
                 ):
     '''Conducting prediction for each output from l_output_parameter. 
     One NN for each output_parameter from l_output_parameter.
@@ -252,6 +254,7 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
     for output_parameter in l_output_parameter:
         model = train_NN(trn_data, vld_data, 
                 geophysical_method, output_parameter, "all", randomseed, 
+                hidden_neurons = hidden_neurons,
                 model_name_template=model_name_template,
                 learning_rate=learning_rate,
                 momentum=momentum,
@@ -277,6 +280,7 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
 
 
 # --- 1 NN with 3 output values
+
 
 def train_NN_3_output(trn_data, vld_data, 
              geophysical_method, samples_number, randomseed, 
