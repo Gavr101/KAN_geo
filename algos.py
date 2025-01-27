@@ -476,12 +476,12 @@ def get_KAN_dataset(trn_data, vld_data, tst_data,
     _tc_X_vld, _tc_Y_vld = torch.from_numpy(_X_vld.to_numpy()), torch.from_numpy(_Y_vld.to_numpy())
     _tc_X_tst, _tc_Y_tst = torch.from_numpy(_X_tst.to_numpy()), torch.from_numpy(_Y_tst.to_numpy())
 
-    dataset_3 = {'train_input': _tc_X_trn,
-             'train_label': _tc_Y_trn,
-             'val_input': _tc_X_vld,
-             'val_label': _tc_Y_vld,
-             'test_input': _tc_X_tst,
-             'test_label': _tc_Y_tst}
+    dataset_3 = {'train_input': torch.tensor(np.array(_tc_X_trn), dtype=torch.float),
+             'train_label': torch.tensor(np.array(_tc_Y_trn), dtype=torch.float),
+             'val_input': torch.tensor(np.array(_tc_X_vld), dtype=torch.float),
+             'val_label': torch.tensor(np.array(_tc_Y_vld), dtype=torch.float),
+             'test_input': torch.tensor(np.array(_tc_X_tst), dtype=torch.float),
+             'test_label': torch.tensor(np.array(_tc_Y_tst), dtype=torch.float)}
     
     return dataset_3
 
