@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
+from sklearn.metrics import r2_score, mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_error # mean_squared_error, 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
 import tensorflow as tf
@@ -180,7 +180,7 @@ def app_stat_NN(model, tst_data,
     _Y_pred = model[0].predict(_X_tst).reshape(-1, 1)
     
     _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
-    _rmse = round(mean_squared_error(_Y_tst, _Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_Y_tst, _Y_pred), 5)
     _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
@@ -272,7 +272,7 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
 
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
@@ -401,7 +401,7 @@ def app_stat_NN_3_output(model, tst_data,
     _Y_pred = model[0].predict(_X_tst)
     
     _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
-    _rmse = round(mean_squared_error(_Y_tst, _Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_Y_tst, _Y_pred), 5)
     _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
@@ -540,7 +540,7 @@ def alg_KAN_model(trn_data, vld_data, tst_data,
     _Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
 
     _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
-    _rmse = round(mean_squared_error(_Y_tst, _Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_Y_tst, _Y_pred), 5)
     _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
@@ -588,7 +588,7 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
         
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
@@ -668,7 +668,7 @@ def vector_pred_KAN_3_output(trn_data, vld_data, tst_data,
     _vector_Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
 
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
@@ -708,7 +708,7 @@ def vector_pred_skl(trn_data, vld_data, tst_data,
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
 
     _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(mean_squared_error(_vector_Y_tst, _vector_Y_pred, squared = False), 5)
+    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
     _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
     _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
 
