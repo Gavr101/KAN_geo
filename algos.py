@@ -77,7 +77,7 @@ def train_NN(trn_data, vld_data,
              geophysical_method, output_parameter, samples_number, randomseed, 
              model_name_template,
              learning_rate=0.1,
-             momentum=0.5,
+             #momentum=0.5,
              tol=0.001,
              n_iter_no_change=500,
              max_epochs=50000,
@@ -114,9 +114,8 @@ def train_NN(trn_data, vld_data,
     _model.add(tf.keras.layers.Dense(hidden_neurons, activation=tf.nn.sigmoid))
     _model.add(tf.keras.layers.Dense(1,  activation=None))    
 
-    _optimizer = keras.optimizers.SGD(learning_rate = learning_rate,#0.001,
-                                      momentum = momentum,#0.5,
-                                      nesterov=True)
+    _optimizer = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    
         
     _model.compile(_optimizer, loss=tf.keras.losses.MeanSquaredError())
     
@@ -124,9 +123,12 @@ def train_NN(trn_data, vld_data,
                                     min_delta=tol * rel_batch_size,#0.0001, 
                                     patience=n_iter_no_change,#500,
                                     restore_best_weights=True)
-      
+    
     ### Train model
     print("Start train model:", _model_name)
+    
+    #print(f'{_X_trn.shape=}')
+    #print(f'{_Y_trn.shape=}')
 
     _history = _model.fit(x=_X_trn, y=_Y_trn,
                           batch_size=math.ceil(len(_X_trn) * rel_batch_size),
@@ -151,60 +153,47 @@ def train_NN(trn_data, vld_data,
     return _model, _history_df, _n_epochs
 
 
+'''
 def app_stat_NN(model, tst_data, 
-                geophysical_method, output_parameter, samples_number, randomseed, 
-                file_name_template, file_name_suffix):
+                geophysical_method, output_parameter,
+                multioutput = False):
         
     _tst_data = copy.deepcopy(tst_data) 
     _geophysical_method = copy.deepcopy(geophysical_method)
     _output_parameter = copy.deepcopy(output_parameter)
-    _samples_number = copy.deepcopy(samples_number) 
-    _randomseed = copy.deepcopy(randomseed)    
-    _file_name_template = copy.deepcopy(file_name_template)
-    _file_name_suffix = copy.deepcopy(file_name_suffix)    
-    #_dir_path = copy.deepcopy(dir_path)
-    
-    _file_name =  (_file_name_template + "_" + 
-                   _geophysical_method + "_" + 
-                   str(_samples_number) + "_" +
-                   _output_parameter + "_rs" +
-                   str(_randomseed) + "_" + 
-                   file_name_suffix)
-      
+
     ### Create input-output data
-    
     _X_tst, _Y_tst = create_XY_data(_tst_data, _output_parameter, _geophysical_method, "all")
   
     ### Apply and calculate statistics
-
     _Y_pred = model[0].predict(_X_tst).reshape(-1, 1)
-    
-    _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_Y_tst, _Y_pred), 5)
-    _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
 
 
+    if not multioutput:
+        _mae = mean_absolute_error(_Y_tst, _Y_pred).round(5)
+        _rmse = root_mean_squared_error(_Y_tst, _Y_pred).round(5)
+        _r2 = r2_score(_Y_tst, _Y_pred).round(5)
+        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred).round(5)
+        out_vector = [_rmse, _mae, _mape, _r2]
+    else:
+        _mae = mean_absolute_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        out_vector = [*_rmse, *_mae, *_mape, *_r2]
 
-    #_statistics_DF = pd.DataFrame({'epochs': model[2]-500, 'MAE': _mae, 'RMSE':_rmse, 'R2': _r2}, 
-    #                              index=[_file_name])
-    
-    #print(_statistics_DF)
-    
-    #_statistics_DF.to_csv(_dir_path+"/"+ _file_name + '.csv')
-    
-    #return _statistics_DF
-    return [_rmse, _mae, _mape, _r2]
+    return out_vector
 
 
 def alg_keras_mlp(trn_data, vld_data, tst_data,
              geophysical_method, output_parameter, randomseed=None,
              learning_rate=0.1,
-             momentum=0.5,
+             #momentum=0.5,
              tol=0.001,
              n_iter_no_change=500,
              max_epochs=50000,
-             rel_batch_size=0.05
+             rel_batch_size=0.05,
+             multioutput=True
              ):
     
     keras_nn = train_NN(trn_data, vld_data,
@@ -213,7 +202,7 @@ def alg_keras_mlp(trn_data, vld_data, tst_data,
                          "all", randomseed, 
                          "?",
                          learning_rate=learning_rate,
-                         momentum=momentum,
+                         #momentum=momentum,
                          tol=tol,
                          n_iter_no_change=n_iter_no_change,
                          max_epochs=max_epochs,
@@ -221,13 +210,12 @@ def alg_keras_mlp(trn_data, vld_data, tst_data,
             
     stat_DF = app_stat_NN(keras_nn, tst_data,
                       geophysical_method,
-                      output_parameter, 
-                      "all", randomseed, 
-                      "stat_udus", "?")
+                      output_parameter,
+                      multioutput=multioutput)
     
     return stat_DF
 
-
+'''
 def vector_pred_NN(trn_data, vld_data, tst_data,
                 geophysical_method, l_output_parameter, randomseed=None, 
                 model_name_template='?',
@@ -237,7 +225,8 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
                 n_iter_no_change=500,
                 max_epochs=50000,
                 rel_batch_size=0.05,
-                hidden_neurons=32
+                hidden_neurons=32,
+                multioutput=True
                 ):
     '''Conducting prediction for each output from l_output_parameter. 
     One NN for each output_parameter from l_output_parameter.
@@ -257,7 +246,6 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
                 hidden_neurons = hidden_neurons,
                 model_name_template=model_name_template,
                 learning_rate=learning_rate,
-                momentum=momentum,
                 tol=tol,
                 n_iter_no_change=n_iter_no_change,
                 max_epochs=max_epochs,
@@ -271,16 +259,24 @@ def vector_pred_NN(trn_data, vld_data, tst_data,
         _vector_Y_pred = np.concatenate((_vector_Y_pred, _Y_pred), axis=1)
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
 
-    _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
+    if not multioutput:
+        _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
+        _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
+        _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
+        _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
+        out_vector = [_rmse, _mae, _mape, _r2]
+    else:
+        _mae = mean_absolute_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        
+        out_vector = [*_rmse, *_mae, *_mape, *_r2]
 
-    return [_rmse, _mae, _mape, _r2]
+    return out_vector
 
 
 # --- 1 NN with 3 output values
-
 
 def train_NN_3_output(trn_data, vld_data, 
              geophysical_method, samples_number, randomseed, 
@@ -331,9 +327,7 @@ def train_NN_3_output(trn_data, vld_data,
     _model.add(tf.keras.layers.Dense(hidden_neurons, activation=tf.nn.sigmoid))
     _model.add(tf.keras.layers.Dense(3,  activation=None))
 
-    _optimizer = keras.optimizers.SGD(learning_rate = learning_rate,#0.001,
-                                      momentum = momentum,#0.5,
-                                      nesterov=True)
+    _optimizer = keras.optimizers.Adam(learning_rate = learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-07)
 
     _model.compile(_optimizer, loss=tf.keras.losses.MeanSquaredError())
     
@@ -356,70 +350,51 @@ def train_NN_3_output(trn_data, vld_data,
 
     print('Number of epochs for training NN model:' + str(_n_epochs))
     
-    ### Save model
-    
-    #_model.save(_dir_path+"/"+ _model_name+".keras")
-    
     _history_df = pd.DataFrame(_history.history)
-    #plot_history_NN(_history_df, _model_name, _dir_path)
-    
-    #_history_df.to_csv(_dir_path+"/"+ _model_name + '_history.csv')
-    
+
     return _model, _history_df, _n_epochs
 
 
 def app_stat_NN_3_output(model, tst_data, 
-                geophysical_method, samples_number, randomseed, 
-                file_name_template, file_name_suffix, l_output_parameter=['H1_8', 'H2_8', 'H3_8']):
+                geophysical_method, l_output_parameter=['H1_8', 'H2_8', 'H3_8'],#, samples_number
+                multioutput=True):
         
     _tst_data = copy.deepcopy(tst_data) 
     _geophysical_method = copy.deepcopy(geophysical_method)
     _l_output_parameter = copy.deepcopy(l_output_parameter)
-    _samples_number = copy.deepcopy(samples_number) 
-    _randomseed = copy.deepcopy(randomseed)    
-    _file_name_template = copy.deepcopy(file_name_template)
-    _file_name_suffix = copy.deepcopy(file_name_suffix)    
-    #_dir_path = copy.deepcopy(dir_path)
+    #_samples_number = copy.deepcopy(samples_number)
     
-    _file_name =  (_file_name_template + "_" + 
-                   _geophysical_method + "_" + 
-                   str(_samples_number) + "_" +
-                   str(_l_output_parameter) + "_rs" +
-                   str(_randomseed) + "_" + 
-                   _file_name_suffix)
-      
     ### Create input-output data
     
     _X_tst, _Y_tst = create_XY_data(_tst_data, _l_output_parameter[0], _geophysical_method, "all")
   
     for _output_parameter in _l_output_parameter[1:]:
-        _, _Y_tst_new = create_XY_data(_tst_data, _output_parameter, _geophysical_method, _samples_number)
+        _, _Y_tst_new = create_XY_data(_tst_data, _output_parameter, _geophysical_method) #, _samples_number
         
         _Y_tst = pd.concat([_Y_tst, _Y_tst_new], axis=1)
     ### Apply and calculate statistics
 
     _Y_pred = model[0].predict(_X_tst)
     
-    _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_Y_tst, _Y_pred), 5)
-    _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
-
-
-
-    #_statistics_DF = pd.DataFrame({'epochs': model[2]-500, 'MAE': _mae, 'RMSE':_rmse, 'R2': _r2}, 
-    #                              index=[_file_name])
     
-    #print(_statistics_DF)
-    
-    #_statistics_DF.to_csv(_dir_path+"/"+ _file_name + '.csv')
-    
-    #return _statistics_DF
-    return [_rmse, _mae, _mape, _r2]
+    if not multioutput:
+        _mae = mean_absolute_error(_Y_tst, _Y_pred).round(5)
+        _rmse = root_mean_squared_error(_Y_tst, _Y_pred).round(5)
+        _r2 = r2_score(_Y_tst, _Y_pred).round(5)
+        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred).round(5)
+        out_vector = [_rmse, _mae, _mape, _r2]
+    else:
+        _mae = mean_absolute_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        out_vector = [*_rmse, *_mae, *_mape, *_r2]
+
+    return out_vector
 
 
 def alg_keras_mlp_3_output(trn_data, vld_data, tst_data,
-             geophysical_method, l_output_parameter=['H1_8', 'H2_8', 'H3_8'], 
+             geophysical_method, output_parameter=['H1_8', 'H2_8', 'H3_8'], 
              hidden_neurons=32,
              randomseed=None,
              learning_rate=0.1,
@@ -427,7 +402,8 @@ def alg_keras_mlp_3_output(trn_data, vld_data, tst_data,
              tol=0.001,
              n_iter_no_change=500,
              max_epochs=50000,
-             rel_batch_size=0.05
+             rel_batch_size=0.05,
+             multioutput=True
              ):
     
     keras_nn = train_NN_3_output(trn_data, vld_data,
@@ -435,6 +411,7 @@ def alg_keras_mlp_3_output(trn_data, vld_data, tst_data,
                          "all", 
                          randomseed, 
                          "?",
+                         l_output_parameter=output_parameter,
                          hidden_neurons=hidden_neurons,
                          learning_rate=learning_rate,
                          momentum=momentum,
@@ -445,14 +422,12 @@ def alg_keras_mlp_3_output(trn_data, vld_data, tst_data,
             
     stat_DF = app_stat_NN_3_output(keras_nn, tst_data,
                       geophysical_method,
-                      "all", randomseed, 
-                      "stat_udus", "?")
+                      multioutput=multioutput)
     
     return stat_DF
 
 
 # ----- KAN -----
-
 
 def get_KAN_dataset(trn_data, vld_data, tst_data,
                     geophysical_method, output_parameter, samples_number
@@ -494,7 +469,7 @@ def train_KAN(dataset_3,
                 tol=0.001,
                 n_iter_no_change=25,
                 max_epochs=500,
-                lamb=0
+                lamb=0,
                 ):
     
     ### Create model
@@ -515,37 +490,6 @@ def train_KAN(dataset_3,
     return model, result
 
 
-def alg_KAN_model(trn_data, vld_data, tst_data,
-                  geophysical_method, output_parameter, randomseed=None,
-                  K=3,hidden_neurons=1,
-                  learning_rate=0.1,
-                  tol=0.001,
-                  n_iter_no_change=25,
-                  max_epochs=500,
-                  lamb=0
-                  ):
-    dataset_3 = get_KAN_dataset(trn_data, vld_data, tst_data,
-                geophysical_method,
-                output_parameter, 
-                "all")
-
-    model = train_KAN(dataset_3, randomseed, K=K, hidden_neurons=hidden_neurons, 
-                      learning_rate=learning_rate,
-                      tol=tol,
-                      n_iter_no_change=n_iter_no_change,
-                      max_epochs=max_epochs,
-                      lamb=lamb)
-
-    _Y_tst = dataset_3['test_label'].detach().numpy()
-    _Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
-
-    _mae = round(mean_absolute_error(_Y_tst, _Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_Y_tst, _Y_pred), 5)
-    _r2 = round(r2_score(_Y_tst, _Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_Y_tst, _Y_pred), 5)
-
-    return [_rmse, _mae, _mape, _r2]
-
 
 def vector_pred_KAN(trn_data, vld_data, tst_data,
                     geophysical_method, l_output_parameter, randomseed=None, 
@@ -554,7 +498,8 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
                     tol=0.001,
                     n_iter_no_change=25,
                     max_epochs=500,
-                    lamb=0):
+                    lamb=0,
+                    multioutput=True):
     '''Conducting prediction for each output from l_output_parameter. 
     One KAN for each output_parameter from l_output_parameter.
     Return vector [mae, mse, r2]
@@ -587,12 +532,20 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
         _vector_Y_pred = np.concatenate((_vector_Y_pred, _Y_pred), axis=1)
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
         
-    _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
-
-    return [_rmse, _mae, _mape, _r2]
+    if not multioutput:
+        _mae = mean_absolute_error(_Y_tst, _Y_pred).round(5)
+        _rmse = root_mean_squared_error(_Y_tst, _Y_pred).round(5)
+        _r2 = r2_score(_Y_tst, _Y_pred).round(5)
+        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred).round(5)
+        out_vector = [_rmse, _mae, _mape, _r2]
+    else:
+        _mae = mean_absolute_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        out_vector = [*_rmse, *_mae, *_mape, *_r2]
+        
+    return out_vector
 
 
 # --- 1 KAN with 3 output values
@@ -645,7 +598,8 @@ def vector_pred_KAN_3_output(trn_data, vld_data, tst_data,
                     tol=0.001,
                     n_iter_no_change=25,
                     max_epochs=500,
-                    lamb=0):
+                    lamb=0,
+                    multioutput=True):
     '''Conducting prediction for outputs from l_output_parameter. 
     One KAN for all output_parameter from l_output_parameter.
     Return vector [mae, mse, r2]
@@ -667,20 +621,30 @@ def vector_pred_KAN_3_output(trn_data, vld_data, tst_data,
     _vector_Y_tst = dataset_3['test_label'].detach().numpy()
     _vector_Y_pred = model[0].forward(dataset_3['test_input']).detach().numpy()
 
-    _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
-
-    return [_rmse, _mae, _mape, _r2]
+    if not multioutput:
+        _mae = mean_absolute_error(_vector_Y_tst, _vector_Y_pred).round(5)
+        _rmse = root_mean_squared_error(_vector_Y_tst, _vector_Y_pred).round(5)
+        _r2 = r2_score(_vector_Y_tst, _vector_Y_pred).round(5)
+        _mape = mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred).round(5)
+        out_vector = [_rmse, _mae, _mape, _r2]
+    else:
+        _mae = mean_absolute_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        out_vector = [*_rmse, *_mae, *_mape, *_r2]
+        
+    return out_vector
 
 
 # ----- SKL models (RF, GB) -----
 
 def vector_pred_skl(trn_data, vld_data, tst_data,
                     geophysical_method, l_output_parameter, randomseed=None,
-                    class_model=RandomForestRegressor, model_kwargs={}):
-    _trn_data = copy.deepcopy(trn_data) 
+                    class_model=RandomForestRegressor, model_kwargs={},
+                    multioutput=True):
+    
+    _trn_data = copy.deepcopy(trn_data)
     _vld_data = copy.deepcopy(vld_data)
     _geophysical_method = copy.deepcopy(geophysical_method)
     _tst_data = copy.deepcopy(tst_data)
@@ -706,13 +670,22 @@ def vector_pred_skl(trn_data, vld_data, tst_data,
         _Y_pred = model.predict(_X_tst).reshape(-1, 1)
         _vector_Y_pred = np.concatenate((_vector_Y_pred, _Y_pred), axis=1)
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
+        
 
-    _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
-    _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
-    _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
+    if not multioutput:
+        _mae = round(mean_absolute_error(_vector_Y_tst, _vector_Y_pred), 5)
+        _rmse = round(root_mean_squared_error(_vector_Y_tst, _vector_Y_pred), 5)
+        _r2 = round(r2_score(_vector_Y_tst, _vector_Y_pred), 5)
+        _mape = round(mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred), 5)
+        out_vector = [_rmse, _mae, _mape, _r2]
+    else:
+        _mae = mean_absolute_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        out_vector = [*_rmse, *_mae, *_mape, *_r2]
 
-    return [_rmse, _mae, _mape, _r2]
+    return out_vector
 
 
 # ----- Multi Exp------
