@@ -533,16 +533,16 @@ def vector_pred_KAN(trn_data, vld_data, tst_data,
         _vector_Y_tst = np.concatenate((_vector_Y_tst, _Y_tst), axis=1)
         
     if not multioutput:
-        _mae = mean_absolute_error(_Y_tst, _Y_pred).round(5)
-        _rmse = root_mean_squared_error(_Y_tst, _Y_pred).round(5)
-        _r2 = r2_score(_Y_tst, _Y_pred).round(5)
-        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred).round(5)
+        _mae = mean_absolute_error(_vector_Y_tst, _vector_Y_pred).round(5)
+        _rmse = root_mean_squared_error(_vector_Y_tst, _vector_Y_pred).round(5)
+        _r2 = r2_score(_vector_Y_tst, _vector_Y_pred).round(5)
+        _mape = mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred).round(5)
         out_vector = [_rmse, _mae, _mape, _r2]
     else:
-        _mae = mean_absolute_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
-        _rmse = root_mean_squared_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
-        _r2 = r2_score(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
-        _mape = mean_absolute_percentage_error(_Y_tst, _Y_pred, multioutput='raw_values').round(5)
+        _mae = mean_absolute_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _rmse = root_mean_squared_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _r2 = r2_score(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
+        _mape = mean_absolute_percentage_error(_vector_Y_tst, _vector_Y_pred, multioutput='raw_values').round(5)
         out_vector = [*_rmse, *_mae, *_mape, *_r2]
         
     return out_vector
@@ -713,8 +713,11 @@ def multi_exp(l_algos_names,
         for i in range(1, num_iter+1):
             print(f'iter: {i}')
             #print(kwargs)
-            l_metrics = alg(trn, val, test, geophysical_method, output_parameter, randomseed=i, **kwargs)
-            res_list.append([alg_name, i]+l_metrics)
+            try:
+                l_metrics = alg(trn, val, test, geophysical_method, output_parameter, randomseed=i, **kwargs)
+                res_list.append([alg_name, i]+l_metrics)
+            except:
+                print('!Exception was raised!')
         print('-------')
 
     return pd.DataFrame(res_list, columns=['alg_name', 'iter']+l_metrics_names)
